@@ -9,6 +9,7 @@
 
 import http.server
 import socketserver
+import threading
 import time
 import random
 
@@ -24,28 +25,41 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
         self.send_header('Content-Type', 'text/plain')
         self.send_header('Connection', 'keep-alive')
         self.end_headers()
+
         # Print client's IP address, requested URL, and user agent  
-        print(f"Client: {self.client_address[0]} Path: {self.path} User-Agent: {self.headers['User-Agent']}")
+        msg = f"\n{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())} Client: {self.client_address[0]} Path: {self.path} User-Agent: {self.headers['User-Agent']}"
+        print(msg)
+        with open('SlowHTTPd.log', 'a') as log_file:
+            log_file.write(msg)
 
         start_time = time.monotonic()
         while True:
             # Generate random data of length 10 bytes
             data = bytes([random.randint(32, 90) for _ in range(10)])
+            print(".", end = '')
             # Write the data to the client
             try:
                 self.wfile.write(data)
+                # Sleep for 1 second to slow down the sending
+                time.sleep(1)
             except ConnectionError:
-                # Client disconnected
                 break
-            # Sleep for 1 second to slow down the sending
-            time.sleep(1)
-        
+            
         end_time = time.monotonic()
-        print(f"Client {self.client_address[0]} connected for {end_time - start_time:.2f} seconds")
+        endured_time = end_time - start_time
+        endured_bytes = round(endured_time,0) *10 
+        msg = f"\n{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())} Client: {self.client_address[0]} Disconnected, they endured {endured_time:,.2f} Seconds {endured_bytes:,.0f} Bytes"
+        print(msg)
+        with open('SlowHTTPd.log', 'a') as log_file:
+            log_file.write(msg)
         return
+
+
+class ThreadedHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    pass
 
 Handler = MyHandler
 
-with socketserver.TCPServer(("", PORT), Handler) as httpd:
-    print("serving at port", PORT)
+with ThreadedHTTPServer(("", PORT), Handler) as httpd:
+    print("Slooooowly serving on port", PORT)
     httpd.serve_forever()
